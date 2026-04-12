@@ -81,7 +81,6 @@ class WindowManager: NSObject, NSWindowDelegate {
                 ClipboardManager.shared.selectedIndex = 0
             }
 
-            NSApp.setActivationPolicy(.regular)
             NSApp.activate(ignoringOtherApps: true)
             panel.center()
             panel.makeKeyAndOrderFront(nil)
@@ -90,8 +89,6 @@ class WindowManager: NSObject, NSWindowDelegate {
 
     func hidePanel() {
         panel?.orderOut(nil)
-        NSApp.setActivationPolicy(.accessory)
-        NSApp.hide(nil)
     }
     
     func paste(item: String) {
