@@ -80,25 +80,99 @@ class ClipboardManager: ObservableObject {
             return
         }
 
-        if let copiedString = pasteboard.string(forType: .string) {
-            let trimmed = copiedString.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty {
-                let frontApp = NSWorkspace.shared.frontmostApplication
-                let appName = frontApp?.localizedName ?? "未知应用"
-                let appIcon = frontApp?.icon ?? NSWorkspace.shared.icon(forFile: "/Applications/")
+        let frontApp = NSWorkspace.shared.frontmostApplication
+        let appName = frontApp?.localizedName ?? "未知应用"
+        let appIcon = frontApp?.icon ?? NSWorkspace.shared.icon(forFile: "/Applications/")
 
-                DispatchQueue.main.async {
-                    self.add(content: copiedString, sourceAppName: appName, sourceAppIcon: appIcon)
-                }
+        // Priority: file → rich text → image → plain text
+        if let detected = detectFileReference() {
+            DispatchQueue.main.async {
+                self.add(content: detected, sourceAppName: appName, sourceAppIcon: appIcon)
+            }
+        } else if let detected = detectRichText() {
+            DispatchQueue.main.async {
+                self.add(content: detected, sourceAppName: appName, sourceAppIcon: appIcon)
+            }
+        } else if let detected = detectImage() {
+            DispatchQueue.main.async {
+                self.add(content: detected, sourceAppName: appName, sourceAppIcon: appIcon)
+            }
+        } else if let detected = detectPlainText() {
+            DispatchQueue.main.async {
+                self.add(content: detected, sourceAppName: appName, sourceAppIcon: appIcon)
             }
         }
     }
 
-    func add(content: String, sourceAppName: String, sourceAppIcon: NSImage) {
-        // Remove duplicate by content
-        if let index = history.firstIndex(where: { $0.content == content }) {
+    // MARK: - Detection Helpers
+
+    private func detectFileReference() -> ClipboardContentType? {
+        guard let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: [
+            .urlReadingFileURLsOnly: true
+        ]) as? [URL] else { return nil }
+        guard let fileURL = urls.first(where: { $0.isFileURL }) else { return nil }
+        return .file(fileURL)
+    }
+
+    private func detectRichText() -> ClipboardContentType? {
+        // Try RTF first, then HTML
+        if let rtfData = pasteboard.data(forType: .rtf),
+           let attrString = try? NSAttributedString(data: rtfData, options: [
+               .documentType: NSAttributedString.DocumentType.rtf
+           ], documentAttributes: nil),
+           !attrString.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return .richText(attributedString: attrString, plainText: attrString.string, sourceFormat: .rtf)
+        }
+        if let htmlData = pasteboard.data(forType: .html),
+           let attrString = try? NSAttributedString(data: htmlData, options: [
+               .documentType: NSAttributedString.DocumentType.html
+           ], documentAttributes: nil),
+           !attrString.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return .richText(attributedString: attrString, plainText: attrString.string, sourceFormat: .html)
+        }
+        return nil
+    }
+
+    private func detectImage() -> ClipboardContentType? {
+        guard let image = NSImage(pasteboard: pasteboard) else { return nil }
+        guard image.isValid else { return nil }
+        return .image(image)
+    }
+
+    private func detectPlainText() -> ClipboardContentType? {
+        guard let string = pasteboard.string(forType: .string) else { return nil }
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return .text(string)
+    }
+
+    func add(content: ClipboardContentType, sourceAppName: String, sourceAppIcon: NSImage) {
+        // Dedup logic varies by type
+        var removeIndex: Int?
+        switch content {
+        case .text(let string):
+            removeIndex = history.firstIndex(where: {
+                if case .text(let existing) = $0.content { return existing == string }
+                return false
+            })
+        case .file(let url):
+            removeIndex = history.firstIndex(where: {
+                if case .file(let existing) = $0.content { return existing.absoluteString == url.absoluteString }
+                return false
+            })
+        case .richText(_, let plainText, _):
+            removeIndex = history.firstIndex(where: {
+                if case .richText(_, let existing, _) = $0.content { return existing == plainText }
+                return false
+            })
+        case .image:
+            break // No dedup for images
+        }
+
+        if let index = removeIndex {
             history.remove(at: index)
         }
+
         let item = ClipboardItem(
             content: content,
             sourceAppName: sourceAppName,
@@ -107,31 +181,52 @@ class ClipboardManager: ObservableObject {
         )
         history.insert(item, at: 0)
 
-        // Keep only last 50 items
+        // Unified 50-item limit across all types
         if history.count > 50 {
             history.removeLast()
         }
 
-        // Reset selection to top
-        if !history.isEmpty {
-            selectedIndex = 0
-        } else {
-            selectedIndex = nil
-        }
+        selectedIndex = 0
     }
 
-    func copyToClipboard(item: String) {
+    func copyToClipboard(item: ClipboardItem) {
         isInternalCopy = true
         pasteboard.clearContents()
-        pasteboard.setString(item, forType: .string)
-        self.lastChangeCount = pasteboard.changeCount
 
-        // Move to top of history if it already exists
-        if let index = history.firstIndex(where: { $0.content == item }) {
-            let existing = history.remove(at: index)
-            history.insert(existing, at: 0)
-            selectedIndex = 0
+        switch item.content {
+        case .text(let string):
+            pasteboard.setString(string, forType: .string)
+
+        case .richText(let attrString, _, let format):
+            // Dual-write: rich format + plain text for compatibility
+            switch format {
+            case .rtf:
+                let rtfData = try? attrString.data(
+                    from: NSRange(location: 0, length: attrString.length),
+                    documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]
+                )
+                if let rtfData { pasteboard.setData(rtfData, forType: .rtf) }
+            case .html:
+                let htmlData = try? attrString.data(
+                    from: NSRange(location: 0, length: attrString.length),
+                    documentAttributes: [.documentType: NSAttributedString.DocumentType.html]
+                )
+                if let htmlData { pasteboard.setData(htmlData, forType: .html) }
+            }
+            pasteboard.setString(attrString.string, forType: .string)
+
+        case .image(let image):
+            if let tiffData = image.tiffRepresentation,
+               let bitmap = NSBitmapImageRep(data: tiffData),
+               let pngData = bitmap.representation(using: .png, properties: [:]) {
+                pasteboard.setData(pngData, forType: .png)
+            }
+
+        case .file(let url):
+            pasteboard.writeObjects([url as NSURL])
         }
+
+        self.lastChangeCount = pasteboard.changeCount
     }
 
     func clear() {
