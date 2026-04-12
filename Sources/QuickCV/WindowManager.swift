@@ -48,7 +48,7 @@ class WindowManager: NSObject, NSWindowDelegate {
                 return nil
             case 36, 76: // Return or Enter
                 if let item = ClipboardManager.shared.confirmSelection() {
-                    WindowManager.shared.paste(item: item.content)
+                    WindowManager.shared.paste(item: item)
                 }
                 return nil
             case 53: // Escape
@@ -93,7 +93,7 @@ class WindowManager: NSObject, NSWindowDelegate {
         NSApp.setActivationPolicy(.accessory)
     }
     
-    func paste(item: String) {
+    func paste(item: ClipboardItem) {
         ClipboardManager.shared.copyToClipboard(item: item)
         NSSound(named: "Tink")?.play()
         hidePanel()
