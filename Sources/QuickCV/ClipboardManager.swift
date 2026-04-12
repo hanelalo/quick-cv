@@ -1,9 +1,46 @@
 import Foundation
 import AppKit
 
+// MARK: - Data Model
+
+enum RichTextFormat {
+    case rtf
+    case html
+}
+
+enum ClipboardContentType {
+    case text(String)
+    case image(NSImage)
+    case file(URL)
+    case richText(attributedString: NSAttributedString, plainText: String, sourceFormat: RichTextFormat)
+
+    var displayText: String? {
+        switch self {
+        case .text(let string): return string
+        case .richText(_, let plainText, _): return plainText
+        case .file(let url): return url.lastPathComponent
+        case .image: return nil
+        }
+    }
+
+    var searchableText: String? {
+        switch self {
+        case .text(let string): return string
+        case .richText(_, let plainText, _): return plainText
+        case .file(let url): return url.lastPathComponent + " " + url.path
+        case .image: return nil
+        }
+    }
+
+    var isImage: Bool {
+        if case .image = self { return true }
+        return false
+    }
+}
+
 struct ClipboardItem: Identifiable {
     let id = UUID()
-    let content: String
+    let content: ClipboardContentType
     let sourceAppName: String
     let sourceAppIcon: NSImage
     let timestamp: Date
