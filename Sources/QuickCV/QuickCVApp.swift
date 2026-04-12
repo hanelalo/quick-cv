@@ -7,31 +7,6 @@ struct QuickCVApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        MenuBarExtra("QuickCV", systemImage: "doc.on.clipboard") {
-            Button("显示历史面板") {
-                WindowManager.shared.togglePanel()
-            }
-            .keyboardShortcut("v", modifiers: [.command, .shift])
-
-            Divider()
-
-            if #available(macOS 14.0, *) {
-                SettingsLink {
-                    Text("设置快捷键...")
-                }
-                Divider()
-            } else {
-                Button("设置快捷键...") {
-                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-                }
-                Divider()
-            }
-
-            Button("退出") {
-                NSApplication.shared.terminate(nil)
-            }
-        }
-
         Settings {
             VStack(alignment: .leading, spacing: 20) {
                 Text("快捷键设置")
@@ -80,13 +55,36 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 button.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "QuickCV")
             }
 
-            button.action = #selector(togglePanel)
-            button.target = self
+            let menu = NSMenu()
+            menu.addItem(NSMenuItem(title: "显示历史面板", action: #selector(togglePanel), keyEquivalent: "V"))
+            menu.items.last?.keyEquivalentModifierMask = [.command, .shift]
+
+            menu.addItem(.separator())
+
+            let settingsItem = NSMenuItem(title: "设置快捷键...", action: #selector(openSettings), keyEquivalent: "")
+            menu.addItem(settingsItem)
+            menu.addItem(.separator())
+
+            menu.addItem(NSMenuItem(title: "退出", action: #selector(quit), keyEquivalent: "q"))
+
+            statusItem?.menu = menu
         }
     }
 
     @objc private func togglePanel() {
         WindowManager.shared.togglePanel()
+    }
+
+    @objc private func openSettings() {
+        if #available(macOS 14.0, *) {
+            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        } else {
+            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        }
+    }
+
+    @objc private func quit() {
+        NSApplication.shared.terminate(nil)
     }
 }
 
