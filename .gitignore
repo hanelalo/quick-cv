@@ -1,0 +1,11 @@
+.build/
+QuickCV.app/
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+.swiftpm/
+xcuserdata/
+*.o
+*.d
+*.dSYM/
+.DS_Store
