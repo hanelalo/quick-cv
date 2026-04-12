@@ -320,27 +320,8 @@ struct ClipItemView: View {
                 appIconView
 
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(item.content)
-                        .lineLimit(2)
-                        .truncationMode(.tail)
-                        .font(.system(size: 13, weight: .regular, design: .monospaced))
-                        .foregroundStyle(isSelected ? .white : Tokens.textPrimary)
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    HStack(spacing: 8) {
-                        Text(item.sourceAppName)
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundStyle(isSelected ? Tokens.accent1 : Tokens.textTertiary)
-
-                        Circle()
-                            .fill(isSelected ? Tokens.accent1.opacity(0.4) : Tokens.textMuted)
-                            .frame(width: 3, height: 3)
-
-                        Text("\(item.content.count) 字符")
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
-                    }
-                    .foregroundStyle(isSelected ? Color.white.opacity(0.6) : Tokens.textTertiary)
+                    contentDisplay
+                    metadataLine
                 }
 
                 if isSelected {
@@ -371,6 +352,105 @@ struct ClipItemView: View {
         .onHover(perform: onHover)
         .animation(.easeInOut(duration: 0.15), value: isSelected)
         .animation(.easeInOut(duration: 0.12), value: isHovered)
+    }
+
+    // MARK: - Content Display
+
+    @ViewBuilder
+    private var contentDisplay: some View {
+        switch item.content {
+        case .text(let string):
+            Text(string)
+                .lineLimit(2)
+                .truncationMode(.tail)
+                .font(.system(size: 13, weight: .regular, design: .monospaced))
+                .foregroundStyle(isSelected ? .white : Tokens.textPrimary)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+        case .richText(_, let plainText, _):
+            HStack(spacing: 6) {
+                Image(systemName: "doc.richtext")
+                    .font(.system(size: 11))
+                    .foregroundStyle(isSelected ? Tokens.accent1 : Tokens.textTertiary)
+                Text(plainText)
+                    .lineLimit(2)
+                    .truncationMode(.tail)
+                    .font(.system(size: 13, weight: .regular, design: .monospaced))
+                    .foregroundStyle(isSelected ? .white : Tokens.textPrimary)
+                    .multilineTextAlignment(.leading)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+        case .file(let url):
+            HStack(spacing: 8) {
+                fileIcon(for: url)
+                Text(url.lastPathComponent)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .font(.system(size: 13, weight: .regular, design: .monospaced))
+                    .foregroundStyle(isSelected ? .white : Tokens.textPrimary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+        case .image(let image):
+            Image(nsImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(maxHeight: 80)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+    }
+
+    // MARK: - Metadata Line
+
+    @ViewBuilder
+    private var metadataLine: some View {
+        HStack(spacing: 8) {
+            Text(item.sourceAppName)
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(isSelected ? Tokens.accent1 : Tokens.textTertiary)
+
+            Circle()
+                .fill(isSelected ? Tokens.accent1.opacity(0.4) : Tokens.textMuted)
+                .frame(width: 3, height: 3)
+
+            typeMetadata
+        }
+        .foregroundStyle(isSelected ? Color.white.opacity(0.6) : Tokens.textTertiary)
+    }
+
+    @ViewBuilder
+    private var typeMetadata: some View {
+        switch item.content {
+        case .text(let string):
+            Text("\(string.count) 字符")
+                .font(.system(size: 10, weight: .medium, design: .rounded))
+
+        case .richText(_, let plainText, _):
+            Text("富文本 · \(plainText.count) 字符")
+                .font(.system(size: 10, weight: .medium, design: .rounded))
+
+        case .file(let url):
+            Text("文件 · \(url.path)")
+                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .lineLimit(1)
+                .truncationMode(.head)
+
+        case .image(let image):
+            Text("图片 · \(Int(image.size.width))x\(Int(image.size.height))")
+                .font(.system(size: 10, weight: .medium, design: .rounded))
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func fileIcon(for url: URL) -> some View {
+        let icon = NSWorkspace.shared.icon(forFile: url.path)
+        return Image(nsImage: icon)
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .frame(width: 24, height: 24)
     }
 
     private var appIconView: some View {
