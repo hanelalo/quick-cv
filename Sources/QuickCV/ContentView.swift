@@ -54,7 +54,10 @@ struct ContentView: View {
         if searchText.isEmpty {
             return enumerated
         }
-        return enumerated.filter { $0.1.content.localizedCaseInsensitiveContains(searchText) }
+        return enumerated.filter { _, item in
+            guard let text = item.content.searchableText else { return false }
+            return text.localizedCaseInsensitiveContains(searchText)
+        }
     }
 
     var body: some View {
@@ -257,7 +260,7 @@ struct ContentView: View {
                 }
             }
         ) {
-            WindowManager.shared.paste(item: item.content)
+            WindowManager.shared.paste(item: item)
         }
     }
 
@@ -476,7 +479,7 @@ struct SearchBarWrapper: NSViewRepresentable {
             }
             if commandSelector == #selector(NSResponder.insertNewline(_:)) {
                 if let item = ClipboardManager.shared.confirmSelection() {
-                    WindowManager.shared.paste(item: item.content)
+                    WindowManager.shared.paste(item: item)
                 }
                 return true
             }
