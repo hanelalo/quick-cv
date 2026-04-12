@@ -81,7 +81,7 @@ class ClipboardManager: ObservableObject {
         }
 
         let frontApp = NSWorkspace.shared.frontmostApplication
-        let appName = frontApp?.localizedName ?? "未知应用"
+        let appName = frontApp?.localizedName ?? "Unknown App"
         let appIcon = frontApp?.icon ?? NSWorkspace.shared.icon(forFile: "/Applications/")
 
         // Priority: file → rich text → image → plain text

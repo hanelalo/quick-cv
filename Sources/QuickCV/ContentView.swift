@@ -177,7 +177,7 @@ struct ContentView: View {
                     )
             }
             .buttonStyle(.plain)
-            .help("清空历史")
+            .help("Clear History")
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
@@ -193,11 +193,11 @@ struct ContentView: View {
                 .foregroundStyle(Tokens.textMuted)
 
             VStack(spacing: 6) {
-                Text("暂无记录")
+                Text("No History")
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundStyle(Tokens.textSecondary)
 
-                Text("复制内容后将自动出现在此处")
+                Text("Copied content will appear here automatically")
                     .font(.system(size: 12, weight: .regular, design: .rounded))
                     .foregroundStyle(Tokens.textTertiary)
             }
@@ -213,7 +213,7 @@ struct ContentView: View {
                 .font(.system(size: 40, weight: .ultraLight))
                 .foregroundStyle(Tokens.textMuted)
 
-            Text("没有匹配的结果")
+            Text("No Matching Results")
                 .font(.system(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(Tokens.textSecondary)
         }
@@ -268,10 +268,10 @@ struct ContentView: View {
 
     private var footerView: some View {
         HStack(spacing: 20) {
-            footerHint(key: "↑↓", label: "导航")
-            footerHint(key: "↵", label: "粘贴")
-            footerHint(key: "⌘K", label: "搜索")
-            footerHint(key: "esc", label: "关闭")
+            footerHint(key: "↑↓", label: "Navigate")
+            footerHint(key: "↵", label: "Paste")
+            footerHint(key: "⌘K", label: "Search")
+            footerHint(key: "esc", label: "Close")
 
             Spacer()
 
@@ -424,21 +424,21 @@ struct ClipItemView: View {
     private var typeMetadata: some View {
         switch item.content {
         case .text(let string):
-            Text("\(string.count) 字符")
+            Text("\(string.count) chars")
                 .font(.system(size: 10, weight: .medium, design: .rounded))
 
         case .richText(_, let plainText, _):
-            Text("富文本 · \(plainText.count) 字符")
+            Text("Rich Text · \(plainText.count) chars")
                 .font(.system(size: 10, weight: .medium, design: .rounded))
 
         case .file(let url):
-            Text("文件 · \(url.path)")
+            Text("File · \(url.path)")
                 .font(.system(size: 10, weight: .medium, design: .rounded))
                 .lineLimit(1)
                 .truncationMode(.head)
 
         case .image(let image):
-            Text("图片 · \(Int(image.size.width))x\(Int(image.size.height))")
+            Text("Image · \(Int(image.size.width))x\(Int(image.size.height))")
                 .font(.system(size: 10, weight: .medium, design: .rounded))
         }
     }
@@ -522,7 +522,7 @@ struct SearchBarWrapper: NSViewRepresentable {
         wrapper.textField.focusRingType = .none
         wrapper.textField.font = .systemFont(ofSize: 13, weight: .regular)
         wrapper.textField.textColor = NSColor(hex: "18181B")
-        wrapper.textField.placeholderString = "搜索..."
+        wrapper.textField.placeholderString = "Search..."
         wrapper.textField.appearance = nil
         wrapper.textField.cell?.sendsActionOnEndEditing = false
         wrapper.textField.delegate = context.coordinator

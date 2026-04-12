@@ -11,27 +11,27 @@ struct QuickCVApp: App {
     var body: some Scene {
         Settings {
             VStack(alignment: .leading, spacing: 20) {
-                Text("快捷键设置")
+                Text("Keyboard Shortcuts")
                     .font(.title2)
                     .fontWeight(.bold)
 
                 HStack {
-                    Text("唤出历史面板:")
+                    Text("Show History Panel:")
                     KeyboardShortcuts.Recorder(for: .togglePanel)
                 }
 
                 Divider()
 
-                Toggle("开机自动启动", isOn: $launchAtLogin)
+                Toggle("Launch at Login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _ in
                         appDelegate.updateLoginItem(enabled: launchAtLogin)
                     }
 
                 Divider()
 
-                Text("自动粘贴提示")
+                Text("Auto-Paste Notice")
                     .font(.headline)
-                Text("QuickCV 可以在您选择历史记录后自动帮您粘贴。\n若要开启此功能，系统可能会弹窗请求辅助功能权限。\n如果未弹窗但无法自动粘贴，请前往：\n系统设置 -> 隐私与安全性 -> 辅助功能 并允许 QuickCV。")
+                Text("QuickCV can automatically paste content after you select it from history.\nTo enable this feature, the system may prompt you to grant Accessibility permissions.\nIf you don't see a prompt but auto-paste doesn't work, please go to:\nSystem Settings -> Privacy & Security -> Accessibility and allow QuickCV.")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -88,16 +88,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
 
             let menu = NSMenu()
-            menu.addItem(NSMenuItem(title: "显示历史面板", action: #selector(togglePanel), keyEquivalent: "V"))
+            menu.addItem(NSMenuItem(title: "Show History Panel", action: #selector(togglePanel), keyEquivalent: "V"))
             menu.items.last?.keyEquivalentModifierMask = [.command, .shift]
 
             menu.addItem(.separator())
 
-            let settingsItem = NSMenuItem(title: "设置...", action: #selector(openSettings), keyEquivalent: "")
+            let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: "")
             menu.addItem(settingsItem)
             menu.addItem(.separator())
 
-            menu.addItem(NSMenuItem(title: "退出", action: #selector(quit), keyEquivalent: "q"))
+            menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
 
             statusItem?.menu = menu
         }
@@ -118,7 +118,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 backing: .buffered,
                 defer: false
             )
-            window.title = "QuickCV 设置"
+            window.title = "QuickCV Settings"
             window.center()
             
             // 创建设置视图
@@ -157,18 +157,18 @@ struct SettingsView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("快捷键设置")
+            Text("Keyboard Shortcuts")
                 .font(.title2)
                 .fontWeight(.bold)
 
             HStack {
-                Text("唤出历史面板:")
+                Text("Show History Panel:")
                 KeyboardShortcuts.Recorder(for: .togglePanel)
             }
 
             Divider()
 
-            Toggle("开机自动启动", isOn: $launchAtLogin)
+            Toggle("Launch at Login", isOn: $launchAtLogin)
                 .onChange(of: launchAtLogin) { newValue in
                     if #available(macOS 13.0, *) {
                         do {
@@ -187,9 +187,9 @@ struct SettingsView: View {
 
             Divider()
 
-            Text("自动粘贴提示")
+            Text("Auto-Paste Notice")
                 .font(.headline)
-            Text("QuickCV 可以在您选择历史记录后自动帮您粘贴。\n若要开启此功能，系统可能会弹窗请求辅助功能权限。\n如果未弹窗但无法自动粘贴，请前往：\n系统设置 -> 隐私与安全性 -> 辅助功能 并允许 QuickCV。")
+            Text("QuickCV can automatically paste content after you select it from history.\nTo enable this feature, the system may prompt you to grant Accessibility permissions.\nIf you don't see a prompt but auto-paste doesn't work, please go to:\nSystem Settings -> Privacy & Security -> Accessibility and allow QuickCV.")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
