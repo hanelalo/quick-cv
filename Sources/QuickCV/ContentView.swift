@@ -73,13 +73,13 @@ struct ContentView: View {
                 } else if filteredHistory.isEmpty {
                     noResultsView
                 } else {
-                    clipListView
+                    splitListView
                 }
 
                 footerView
             }
         }
-        .frame(width: 480, height: 680)
+        .frame(width: 740, height: 600)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -220,31 +220,36 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Clip List
+    // MARK: - Split List
 
-    private var clipListView: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.vertical, showsIndicators: false) {
-                clipListContent
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-            }
-            .onChange(of: manager.selectedIndex) { newIndex in
-                if let newIndex = newIndex {
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        proxy.scrollTo(newIndex, anchor: .center)
+    private var splitListView: some View {
+        HStack(spacing: 0) {
+            // Left panel — compact list
+            ScrollViewReader { proxy in
+                ScrollView(.vertical, showsIndicators: false) {
+                    LazyVStack(spacing: 3) {
+                        ForEach(filteredHistory, id: \.0) { index, item in
+                            clipItemRow(for: index, item: item)
+                                .id(index)
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                }
+                .frame(width: 260)
+                .onChange(of: manager.selectedIndex) { newIndex in
+                    if let newIndex = newIndex {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            proxy.scrollTo(newIndex, anchor: .center)
+                        }
                     }
                 }
             }
-        }
-    }
 
-    private var clipListContent: some View {
-        LazyVStack(spacing: 4) {
-            ForEach(filteredHistory, id: \.0) { index, item in
-                clipItemRow(for: index, item: item)
-                    .id(index)
-            }
+            Divider().overlay(Tokens.border)
+
+            // Right panel — preview
+            PreviewPanel(manager: manager)
         }
     }
 
@@ -304,6 +309,161 @@ struct ContentView: View {
     }
 }
 
+// MARK: - Preview Panel
+
+struct PreviewPanel: View {
+    @ObservedObject var manager: ClipboardManager
+
+    private var selectedItem: ClipboardItem? {
+        guard let index = manager.selectedIndex, index < manager.history.count else { return nil }
+        return manager.history[index]
+    }
+
+    var body: some View {
+        Group {
+            if let item = selectedItem {
+                previewContent(for: item)
+            } else {
+                placeholderView
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Tokens.bgPrimary)
+    }
+
+    private var placeholderView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "eye")
+                .font(.system(size: 36, weight: .ultraLight))
+                .foregroundStyle(Tokens.textMuted)
+
+            Text("Select an item to preview")
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .foregroundStyle(Tokens.textTertiary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private func previewContent(for item: ClipboardItem) -> some View {
+        switch item.content {
+        case .text(let string):
+            textPreview(text: string, sourceApp: item.sourceAppName, appIcon: item.sourceAppIcon)
+        case .richText(let attrString, let plainText, let format):
+            richTextPreview(attrString: attrString, plainText: plainText, format: format, sourceApp: item.sourceAppName, appIcon: item.sourceAppIcon)
+        case .file(let url):
+            filePreview(url: url, sourceApp: item.sourceAppName, appIcon: item.sourceAppIcon)
+        case .image(let image):
+            imagePreview(image: image, sourceApp: item.sourceAppName, appIcon: item.sourceAppIcon)
+        }
+    }
+
+    private func textPreview(text: String, sourceApp: String, appIcon: NSImage) -> some View {
+        VStack(spacing: 0) {
+            previewHeader(icon: appIcon, title: sourceApp, badge: "\(text.count) characters")
+
+            ScrollView(.vertical, showsIndicators: true) {
+                Text(text)
+                    .font(.system(size: 13, weight: .regular, design: .monospaced))
+                    .foregroundStyle(Tokens.textPrimary)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(16)
+            }
+        }
+    }
+
+    private func richTextPreview(attrString: NSAttributedString, plainText: String, format: RichTextFormat, sourceApp: String, appIcon: NSImage) -> some View {
+        VStack(spacing: 0) {
+            let formatLabel = format == .rtf ? "RTF" : "HTML"
+            previewHeader(icon: appIcon, title: sourceApp, badge: "Rich Text (\(formatLabel)) · \(plainText.count) characters")
+
+            ScrollView(.vertical, showsIndicators: true) {
+                Text(plainText)
+                    .font(.system(size: 13, weight: .regular, design: .monospaced))
+                    .foregroundStyle(Tokens.textPrimary)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(16)
+            }
+        }
+    }
+
+    private func filePreview(url: URL, sourceApp: String, appIcon: NSImage) -> some View {
+        VStack(spacing: 0) {
+            previewHeader(icon: appIcon, title: sourceApp, badge: "File")
+
+            VStack(spacing: 16) {
+                let icon = NSWorkspace.shared.icon(forFile: url.path)
+                Image(nsImage: icon)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 64, height: 64)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .shadow(color: .black.opacity(0.1), radius: 6, y: 3)
+
+                VStack(spacing: 8) {
+                    Text(url.lastPathComponent)
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Tokens.textPrimary)
+
+                    Text(url.path)
+                        .font(.system(size: 11, weight: .regular, design: .monospaced))
+                        .foregroundStyle(Tokens.textTertiary)
+                        .textSelection(.enabled)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private func imagePreview(image: NSImage, sourceApp: String, appIcon: NSImage) -> some View {
+        VStack(spacing: 0) {
+            previewHeader(icon: appIcon, title: sourceApp, badge: "\(Int(image.size.width)) × \(Int(image.size.height))")
+
+            ScrollView([.vertical, .horizontal], showsIndicators: true) {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .shadow(color: .black.opacity(0.06), radius: 4, y: 2)
+                    .padding(16)
+            }
+        }
+    }
+
+    private func previewHeader(icon: NSImage, title: String, badge: String) -> some View {
+        HStack(spacing: 8) {
+            Image(nsImage: icon)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 20, height: 20)
+                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+
+            Text(title)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(Tokens.textSecondary)
+
+            Spacer()
+
+            Text(badge)
+                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .foregroundStyle(Tokens.textTertiary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Tokens.bgTertiary)
+                )
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Tokens.bgSecondary)
+    }
+}
+
 // MARK: - Clip Item
 
 struct ClipItemView: View {
@@ -316,28 +476,28 @@ struct ClipItemView: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(alignment: .center, spacing: 14) {
+            HStack(alignment: .center, spacing: 10) {
                 appIconView
 
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 3) {
                     contentDisplay
                     metadataLine
                 }
 
                 if isSelected {
                     Image(systemName: "return")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(.white.opacity(0.8))
-                        .frame(width: 28, height: 28)
+                        .frame(width: 24, height: 24)
                         .background(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
                                 .fill(.white.opacity(0.15))
                         )
                         .transition(.scale.combined(with: .opacity))
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: Tokens.radiusItem, style: .continuous)
                     .fill(backgroundColor)
@@ -361,34 +521,34 @@ struct ClipItemView: View {
         switch item.content {
         case .text(let string):
             Text(string)
-                .lineLimit(2)
+                .lineLimit(1)
                 .truncationMode(.tail)
-                .font(.system(size: 13, weight: .regular, design: .monospaced))
+                .font(.system(size: 12, weight: .regular, design: .monospaced))
                 .foregroundStyle(isSelected ? .white : Tokens.textPrimary)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
         case .richText(_, let plainText, _):
-            HStack(spacing: 6) {
+            HStack(spacing: 5) {
                 Image(systemName: "doc.richtext")
-                    .font(.system(size: 11))
+                    .font(.system(size: 10))
                     .foregroundStyle(isSelected ? Tokens.accent1 : Tokens.textTertiary)
                 Text(plainText)
-                    .lineLimit(2)
+                    .lineLimit(1)
                     .truncationMode(.tail)
-                    .font(.system(size: 13, weight: .regular, design: .monospaced))
+                    .font(.system(size: 12, weight: .regular, design: .monospaced))
                     .foregroundStyle(isSelected ? .white : Tokens.textPrimary)
                     .multilineTextAlignment(.leading)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
         case .file(let url):
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 fileIcon(for: url)
                 Text(url.lastPathComponent)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                    .font(.system(size: 13, weight: .regular, design: .monospaced))
+                    .font(.system(size: 12, weight: .regular, design: .monospaced))
                     .foregroundStyle(isSelected ? .white : Tokens.textPrimary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -397,8 +557,8 @@ struct ClipItemView: View {
             Image(nsImage: image)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(maxHeight: 80)
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .frame(maxHeight: 36)
+                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
         }
     }
 
@@ -406,14 +566,14 @@ struct ClipItemView: View {
 
     @ViewBuilder
     private var metadataLine: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 5) {
             Text(item.sourceAppName)
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .font(.system(size: 9, weight: .semibold, design: .rounded))
                 .foregroundStyle(isSelected ? Tokens.accent1 : Tokens.textTertiary)
 
             Circle()
                 .fill(isSelected ? Tokens.accent1.opacity(0.4) : Tokens.textMuted)
-                .frame(width: 3, height: 3)
+                .frame(width: 2.5, height: 2.5)
 
             typeMetadata
         }
@@ -425,21 +585,19 @@ struct ClipItemView: View {
         switch item.content {
         case .text(let string):
             Text("\(string.count) chars")
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .font(.system(size: 9, weight: .medium, design: .rounded))
 
         case .richText(_, let plainText, _):
             Text("Rich Text · \(plainText.count) chars")
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .font(.system(size: 9, weight: .medium, design: .rounded))
 
-        case .file(let url):
-            Text("File · \(url.path)")
-                .font(.system(size: 10, weight: .medium, design: .rounded))
-                .lineLimit(1)
-                .truncationMode(.head)
+        case .file:
+            Text("File")
+                .font(.system(size: 9, weight: .medium, design: .rounded))
 
         case .image(let image):
             Text("Image · \(Int(image.size.width))x\(Int(image.size.height))")
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .font(.system(size: 9, weight: .medium, design: .rounded))
         }
     }
 
@@ -457,9 +615,9 @@ struct ClipItemView: View {
         Image(nsImage: item.sourceAppIcon)
             .resizable()
             .aspectRatio(contentMode: .fit)
-            .frame(width: 36, height: 36)
-            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-            .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
+            .frame(width: 28, height: 28)
+            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .shadow(color: .black.opacity(0.1), radius: 3, y: 1)
     }
 
     private var backgroundColor: Color {

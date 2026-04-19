@@ -16,7 +16,7 @@ class WindowManager: NSObject, NSWindowDelegate {
 
     func setup(manager: ClipboardManager) {
         let panel = FloatingPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 680),
+            contentRect: NSRect(x: 0, y: 0, width: 740, height: 600),
             styleMask: [.borderless, .fullSizeContentView],
             backing: .buffered,
             defer: false
