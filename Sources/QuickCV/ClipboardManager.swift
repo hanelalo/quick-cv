@@ -121,14 +121,16 @@ class ClipboardManager: ObservableObject {
                .documentType: NSAttributedString.DocumentType.rtf
            ], documentAttributes: nil),
            !attrString.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return .richText(attributedString: attrString, plainText: attrString.string, sourceFormat: .rtf)
+            let plainText = attrString.string.trimmingCharacters(in: .newlines)
+            return .richText(attributedString: attrString, plainText: plainText, sourceFormat: .rtf)
         }
         if let htmlData = pasteboard.data(forType: .html),
            let attrString = try? NSAttributedString(data: htmlData, options: [
                .documentType: NSAttributedString.DocumentType.html
            ], documentAttributes: nil),
            !attrString.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return .richText(attributedString: attrString, plainText: attrString.string, sourceFormat: .html)
+            let plainText = attrString.string.trimmingCharacters(in: .newlines)
+            return .richText(attributedString: attrString, plainText: plainText, sourceFormat: .html)
         }
         return nil
     }
@@ -143,7 +145,9 @@ class ClipboardManager: ObservableObject {
         guard let string = pasteboard.string(forType: .string) else { return nil }
         let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        return .text(string)
+        // Remove trailing newlines — they're usually an artifact of line-based selection, not intended content
+        let cleaned = string.trimmingCharacters(in: .newlines)
+        return .text(cleaned)
     }
 
     func add(content: ClipboardContentType, sourceAppName: String, sourceAppIcon: NSImage) {
