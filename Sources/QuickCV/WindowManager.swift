@@ -95,21 +95,20 @@ class WindowManager: NSObject, NSWindowDelegate {
     
     func paste(item: ClipboardItem) {
         ClipboardManager.shared.copyToClipboard(item: item)
-        NSSound(named: "Tink")?.play()
         hidePanel()
-        
+
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
         let accessEnabled = AXIsProcessTrustedWithOptions(options as CFDictionary)
-        
+
         if accessEnabled {
             let source = CGEventSource(stateID: .hidSystemState)
             let cmdVDown = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true)
             let cmdVUp = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false)
             cmdVDown?.flags = .maskCommand
             cmdVUp?.flags = .maskCommand
-            
-            // Wait slightly for our window to disappear and the target app to regain focus
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+
+            // Wait for target app to regain focus before simulating Cmd+V
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 cmdVDown?.post(tap: .cghidEventTap)
                 cmdVUp?.post(tap: .cghidEventTap)
             }
