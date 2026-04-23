@@ -12,6 +12,10 @@ class WindowManager: NSObject, NSWindowDelegate {
     var panel: FloatingPanel?
     private var eventMonitor: Any?
     static var onToggleSearch: (() -> Void)?
+    static var onStartSearchWithCharacter: ((String) -> Void)?
+    static var onMoveSelectionUp: (() -> Void)?
+    static var onMoveSelectionDown: (() -> Void)?
+    static var onConfirmSelection: (() -> Void)?
     static var isSearchActive: Bool = false
 
     func setup(manager: ClipboardManager) {
@@ -41,15 +45,13 @@ class WindowManager: NSObject, NSWindowDelegate {
             }
             switch event.keyCode {
             case 125: // Down arrow
-                ClipboardManager.shared.moveSelectionDown()
+                WindowManager.onMoveSelectionDown?()
                 return nil
             case 126: // Up arrow
-                ClipboardManager.shared.moveSelectionUp()
+                WindowManager.onMoveSelectionUp?()
                 return nil
             case 36, 76: // Return or Enter
-                if let item = ClipboardManager.shared.confirmSelection() {
-                    WindowManager.shared.paste(item: item)
-                }
+                WindowManager.onConfirmSelection?()
                 return nil
             case 53: // Escape
                 if WindowManager.isSearchActive {
@@ -62,6 +64,20 @@ class WindowManager: NSObject, NSWindowDelegate {
                 if event.modifierFlags.contains(.command) && event.keyCode == 40 { // Cmd+K
                     WindowManager.onToggleSearch?()
                     return nil
+                }
+                if WindowManager.isSearchActive {
+                    return event
+                }
+                let modifiers: NSEvent.ModifierFlags = [.command, .control, .option]
+                if !event.modifierFlags.intersection(modifiers).isEmpty {
+                    return event
+                }
+                if let chars = event.characters, !chars.isEmpty {
+                    let scalar = chars.unicodeScalars.first!
+                    if !CharacterSet.controlCharacters.contains(scalar) {
+                        WindowManager.onStartSearchWithCharacter?(String(scalar))
+                        return nil
+                    }
                 }
                 return event
             }

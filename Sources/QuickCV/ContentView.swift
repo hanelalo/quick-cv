@@ -48,6 +48,7 @@ struct ContentView: View {
     @State private var searchText = ""
     @State private var isSearchMode = false
     @State private var hoveredIndex: Int? = nil
+    @State private var selectedFilteredIndex: Int? = nil
 
     private var filteredHistory: [(Int, ClipboardItem)] {
         let enumerated = Array(manager.history.enumerated())
@@ -91,6 +92,21 @@ struct ContentView: View {
             WindowManager.onToggleSearch = { [self] in
                 toggleSearch()
             }
+            WindowManager.onStartSearchWithCharacter = { [self] char in
+                startSearchWithCharacter(char)
+            }
+            WindowManager.onMoveSelectionUp = { [self] in
+                moveSelectionUp()
+            }
+            WindowManager.onMoveSelectionDown = { [self] in
+                moveSelectionDown()
+            }
+            WindowManager.onConfirmSelection = { [self] in
+                confirmSelection()
+            }
+        }
+        .onChange(of: searchText) { _ in
+            syncFilteredSelection()
         }
     }
 
@@ -115,6 +131,83 @@ struct ContentView: View {
         WindowManager.isSearchActive = isSearchMode
         if !isSearchMode {
             searchText = ""
+            // When exiting search, move selection to the filtered item's original index
+            if let sel = selectedFilteredIndex, sel < filteredHistory.count {
+                manager.selectedIndex = filteredHistory[sel].0
+            }
+        } else {
+            // When entering search, snap selectedFilteredIndex to current selectedIndex
+            if let current = manager.selectedIndex {
+                if let row = filteredHistory.firstIndex(where: { $0.0 == current }) {
+                    selectedFilteredIndex = row
+                } else {
+                    selectedFilteredIndex = filteredHistory.isEmpty ? nil : 0
+                }
+            } else {
+                selectedFilteredIndex = filteredHistory.isEmpty ? nil : 0
+            }
+        }
+    }
+
+    private func startSearchWithCharacter(_ char: String) {
+        isSearchMode = true
+        searchText = char
+        WindowManager.isSearchActive = true
+    }
+
+    private func syncFilteredSelection() {
+        if filteredHistory.isEmpty {
+            selectedFilteredIndex = nil
+            return
+        }
+        // If current selectedIndex is still in filtered results, keep it
+        if let current = manager.selectedIndex,
+           let row = filteredHistory.firstIndex(where: { $0.0 == current }) {
+            selectedFilteredIndex = row
+        } else {
+            selectedFilteredIndex = 0
+            manager.selectedIndex = filteredHistory[0].0
+        }
+    }
+
+    /// Navigates up/down in the current visible list (filtered or full)
+    private func moveSelectionUp() {
+        if WindowManager.isSearchActive {
+            guard !filteredHistory.isEmpty else { return }
+            let count = filteredHistory.count
+            if let current = selectedFilteredIndex {
+                let next = current > 0 ? current - 1 : count - 1
+                selectedFilteredIndex = next
+                manager.selectedIndex = filteredHistory[next].0
+            } else {
+                selectedFilteredIndex = count - 1
+                manager.selectedIndex = filteredHistory[count - 1].0
+            }
+        } else {
+            ClipboardManager.shared.moveSelectionUp()
+        }
+    }
+
+    private func moveSelectionDown() {
+        if WindowManager.isSearchActive {
+            guard !filteredHistory.isEmpty else { return }
+            let count = filteredHistory.count
+            if let current = selectedFilteredIndex {
+                let next = current < count - 1 ? current + 1 : 0
+                selectedFilteredIndex = next
+                manager.selectedIndex = filteredHistory[next].0
+            } else {
+                selectedFilteredIndex = 0
+                manager.selectedIndex = filteredHistory[0].0
+            }
+        } else {
+            ClipboardManager.shared.moveSelectionDown()
+        }
+    }
+
+    private func confirmSelection() {
+        if let item = ClipboardManager.shared.confirmSelection() {
+            WindowManager.shared.paste(item: item)
         }
     }
 
@@ -275,7 +368,7 @@ struct ContentView: View {
         HStack(spacing: 20) {
             footerHint(key: "↑↓", label: "Navigate")
             footerHint(key: "↵", label: "Paste")
-            footerHint(key: "⌘K", label: "Search")
+            footerHint(key: "Type", label: "Search")
             footerHint(key: "esc", label: "Close")
 
             Spacer()
@@ -685,6 +778,9 @@ struct SearchBarWrapper: NSViewRepresentable {
         wrapper.textField.cell?.sendsActionOnEndEditing = false
         wrapper.textField.delegate = context.coordinator
         context.coordinator.field = wrapper.textField
+        if !text.isEmpty {
+            wrapper.pendingText = text
+        }
         return wrapper
     }
 
@@ -693,8 +789,12 @@ struct SearchBarWrapper: NSViewRepresentable {
             context.coordinator.isEditing = false
             return
         }
+        if nsView.pendingText != nil {
+            return
+        }
         if nsView.textField.stringValue != text {
             nsView.textField.stringValue = text
+            nsView.textField.currentEditor()?.moveToEndOfLine(nil)
         }
     }
 
@@ -729,6 +829,7 @@ struct SearchBarWrapper: NSViewRepresentable {
 /// NSView wrapper that auto-focuses the text field when added to a window
 final class FocusSearchField: NSView {
     let textField = NSTextField()
+    var pendingText: String?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -751,7 +852,13 @@ final class FocusSearchField: NSView {
         super.viewDidMoveToWindow()
         guard window != nil else { return }
         DispatchQueue.main.async { [weak self] in
-            self?.window?.makeFirstResponder(self?.textField)
+            guard let self else { return }
+            self.window?.makeFirstResponder(self.textField)
+            if let pending = self.pendingText {
+                self.textField.stringValue = pending
+                self.textField.currentEditor()?.moveToEndOfLine(nil)
+                self.pendingText = nil
+            }
         }
     }
 }
